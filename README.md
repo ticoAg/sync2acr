@@ -16,10 +16,11 @@
 
 ## 快速开始
 ```bash
-# 1) 安装 s2i（默认装到 ~/.local/bin）
-./sync2acr.sh
-# 或指定 uninstall
-./sync2acr.sh uninstall
+# 1) 一行安装 s2i（默认装到 ~/.local/bin）
+curl -fsSL https://raw.githubusercontent.com/ticoAg/sync2acr/main/sync2acr.sh | bash
+
+# 或一行卸载
+curl -fsSL https://raw.githubusercontent.com/ticoAg/sync2acr/main/sync2acr.sh | bash -s -- uninstall
 
 # 2) 确保安装目录在 PATH 中
 export PATH="$HOME/.local/bin:$PATH"
