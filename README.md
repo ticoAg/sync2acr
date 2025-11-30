@@ -1,12 +1,13 @@
 # sync2acr / s2i 安装脚本
 
-一个用于在本地快速安装并使用 `s2i` 小工具的单文件脚本，帮助你把任意容器镜像同步到阿里云容器镜像服务（ACR），并提供常用的登录、拉取、重命名（打 tag）、推送及渠道管理能力。
+一个用于在本地快速安装并使用 `s2i` 小工具的脚本，帮助你把任意容器镜像同步到阿里云容器镜像服务（ACR），并提供常用的登录、拉取、重命名（打 tag）、推送、镜像清单复制（multi-arch mirror）及渠道管理能力。
 
 ## 主要特性
 - 一键安装/卸载：将 `s2i` 安装到 `~/.local/bin`（或自定义目录）。
 - ACR 优先支持：默认使用 `registry.cn-beijing.aliyuncs.com` 和你的命名空间。
-- 常用子命令：`login` / `pull` / `rename` / `push` / `list` / `channel`，风格类似 `git`。
+- 常用子命令：`login` / `pull` / `rename` / `push` / `mirror` / `list` / `channel`，风格类似 `git`。
 - 自动打 tag：`push` 会在需要时自动为镜像添加 ACR 前缀与命名空间。
+- 多架构同步：`mirror` 使用 `docker buildx imagetools create` 在 registry 之间复制 multi-arch manifest，实现同一 tag 在 AMD64 / ARM64 上都能自动匹配架构。
 - 支持渠道管理：默认渠道 `aliyun`；可列出/查看/切换当前渠道，配置写入 `~/.config/s2i/config`。
 
 ## 环境依赖
@@ -42,12 +43,13 @@ s2i channel set aliyun  # 切换渠道并持久化
 - `s2i pull IMAGE[:TAG]`：拉取镜像，等价于 `docker pull`。
 - `s2i rename SRC_IMAGE[:TAG] TARGET_NAME`：仅本地打 tag，不推送；生成的目标为 `$ALIYUN_REGISTRY/$ALIYUN_NAMESPACE/TARGET_NAME:TAG`。
 - `s2i push SRC_IMAGE[:TAG] [TARGET_NAME[:TARGET_TAG]]`：不存在就先拉取，再打 ACR tag 并推送。目标名/标签可省略。
+- `s2i mirror SRC_IMAGE[:TAG] [TARGET_NAME[:TARGET_TAG]]`：使用 `docker buildx imagetools create` 把上游 multi-arch 镜像（如 Docker Hub）复制成 ACR 上的同名多架构镜像，适合需要一套 tag 同时兼容 AMD64 和 ARM64 的场景。
 - `s2i list [--acr|--all]`：列出本地镜像，默认列出所有；`--acr` 只看当前渠道命名空间。
 - `s2i version IMAGE[:TAG]`：查看本地镜像的 ID、RepoDigest 以及常见版本标签（如果存在）。
 - `s2i channel [list|current|set <CHANNEL>]`：管理渠道并持久化到 `~/.config/s2i/config`。
 - `s2i help`：查看内置帮助。
 
-## 可配置项（修改 `sync2acr.sh` 中的内嵌脚本）
+## 可配置项（修改 `s2i` 脚本）
 - `ALIYUN_REGISTRY`：默认 `registry.cn-beijing.aliyuncs.com`。
 - `ALIYUN_USERNAME`：用于提示的默认用户名。
 - `ALIYUN_NAMESPACE`：你的 ACR 命名空间，影响推送目标。
