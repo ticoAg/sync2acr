@@ -189,6 +189,8 @@ Commands:
         $(basename "$0") push nginx:1.25
         $(basename "$0") push minio/minio:latest minio
         $(basename "$0") push postgres:latest postgres:18.1
+        # 等价用法示例（未指定目标时的默认行为）：
+        #   push debian:bookworm-slim          == push debian:bookworm-slim debian:bookworm-slim
 
   list [--acr|--all]
       查看本地镜像：
@@ -277,18 +279,15 @@ cmd_login() {
 
 ensure_registry_login() {
     local registry="$1"
-    echo "🔍 Checking login status for $registry ..."
     local docker_config_dir="${DOCKER_CONFIG:-$HOME/.docker}"
     local docker_config_file="$docker_config_dir/config.json"
 
     if [ -f "$docker_config_file" ] && grep -q "\"$registry\"" "$docker_config_file" 2>/dev/null; then
-        echo "✅ Already logged in to $registry (found in $docker_config_file)."
         return 0
     fi
 
-    echo "🔑 Not logged in to $registry yet."
+    echo "❌ Not logged in to $registry"
     echo "   请先执行：$(basename "$0") login USERNAME"
-    echo "   （例如：$(basename "$0") login $ALIYUN_USERNAME）"
     return 1
 }
 
@@ -397,14 +396,12 @@ cmd_push() {
         fi
     fi
 
-    echo "📥 Ensuring local image exists: $src_with_tag"
     if docker image inspect "$src_with_tag" >/dev/null 2>&1; then
-        echo "✅ Found local image: $src_with_tag"
+        echo "📥 Using local image: $src_with_tag"
     else
-        echo "ℹ️ Local image not found, pulling from registry..."
+        echo "📥 Pulling image: $src_with_tag"
         if ! docker pull "$src_with_tag"; then
-            echo "❌ Failed to pull $src_with_tag and no local image is available."
-            echo "   请先在本地构建或拉取该镜像后再重试。"
+            echo "❌ Failed to pull $src_with_tag (no local image available)"
             return 1
         fi
     fi
@@ -429,8 +426,7 @@ cmd_push() {
         local detected_version
         detected_version=$(detect_image_version "$src_with_tag" 2>/dev/null || true)
         if [[ -n "$detected_version" ]]; then
-            echo "🏷️  Detected version: $detected_version"
-            echo "    将使用该版本作为目标 tag（原本为: $target_tag）"
+            echo "🏷️  Detected version: $detected_version (use as target tag)"
             target_tag="$detected_version"
         fi
     fi
@@ -441,27 +437,21 @@ cmd_push() {
     ensure_registry_login "$CHANNEL_REGISTRY" || return 1
 
     local target_image="$CHANNEL_REGISTRY/$CHANNEL_NAMESPACE/$target_name:$target_tag"
+    local target_ref="$target_name:$target_tag"
 
-    echo "🏷️  Tagging as: $target_image"
+    echo "🏷️  Tagging: $src_with_tag -> $target_ref"
     docker tag "$src_with_tag" "$target_image"
 
-    echo "📤 Pushing to $CHANNEL_REGISTRY: $target_image"
+    echo "📤 Pushing: $target_ref"
     docker push "$target_image"
     if [ $? -eq 0 ]; then
-        echo "✅ Successfully pushed: $src_with_tag → $target_image"
+        echo "✅ Successfully pushed: $src_with_tag → $target_ref"
     else
         echo "❌ Failed to push: $target_image"
-
-        # 根据是否开启“自动创建仓库”给出不同的提示
         if [[ "$CHANNEL_AUTO_CREATE" != "true" ]]; then
-            echo "💡 当前配置为：Registry 不自动创建仓库。"
-            echo "   请先在 $CHANNEL_REGISTRY 控制台手动创建仓库：$CHANNEL_NAMESPACE/$target_name，然后重试。"
+            echo "   请确认 ACR 中已创建仓库：$CHANNEL_NAMESPACE/$target_name，并检查 push 权限。"
         else
-            echo "💡 当前配置为：Registry 支持按需自动创建仓库。"
-            echo "   如果多次失败，请检查："
-            echo "     - 命名空间 $CHANNEL_NAMESPACE 是否存在，账号是否有 push 权限"
-            echo "     - 渠道配置是否正确（例如 region、namespace）"
-            echo "     - 本机到 $CHANNEL_REGISTRY 的网络连通性"
+            echo "   请检查 push 权限配置和到 $CHANNEL_REGISTRY 的网络连通性。"
         fi
         return 1
     fi
@@ -576,40 +566,18 @@ cmd_version() {
         image_with_tag="$image:latest"
     fi
 
-    echo "🔍 Inspecting local image: $image_with_tag"
-
     if ! docker image inspect "$image_with_tag" >/dev/null 2>&1; then
         echo "❌ Local image not found: $image_with_tag"
-        echo "   请先在本地构建或拉取该镜像，例如："
-        echo "     docker pull $image_with_tag"
-        echo "   或使用："
-        echo "     $(basename \"$0\") pull $image_with_tag"
         return 1
     fi
 
-    local image_id repo_digests version_label
-
-    image_id=$(docker image inspect "$image_with_tag" --format '{{.Id}}' 2>/dev/null || true)
-    repo_digests=$(docker image inspect "$image_with_tag" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null || true)
+    local version_label
     version_label=$(detect_image_version "$image_with_tag" 2>/dev/null || true)
 
-    echo "📦 Image: $image_with_tag"
-    if [[ -n "$image_id" ]]; then
-        echo "🆔 ID: $image_id"
-    fi
-
-    if [[ -n "$repo_digests" ]]; then
-        echo "🔖 RepoDigests:"
-        echo "$repo_digests" | sed 's/^/  - /'
-    fi
-
     if [[ -n "$version_label" ]]; then
-        echo "🏷️  Detected app version: $version_label"
+        echo "$version_label"
     else
-        echo "ℹ️ 未在镜像标签中发现常见的版本信息字段。"
-        echo "   你可以尝试在镜像内部执行版本命令，例如："
-        echo "     docker run --rm $image_with_tag --version"
-        echo "   或参考该镜像的官方文档。"
+        echo "unknown"
     fi
 }
 
