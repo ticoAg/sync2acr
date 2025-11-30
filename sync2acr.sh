@@ -421,8 +421,11 @@ cmd_push() {
         fi
     fi
 
-    # 如果源是 name:latest 且用户只给了目标仓库名（不带 tag），尝试从镜像中推断真实版本号并作为目标 tag
-    if [[ "$is_image_id" != "true" && "$src_tag" == "latest" && -n "$target_arg" && "$target_arg" != *":"* ]]; then
+    # 如果源是 name:latest 且目标 tag 未被显式指定，尝试从镜像中推断真实版本号并作为目标 tag
+    # 覆盖场景：
+    #   push postgres:latest                 -> postgres:<real_version>
+    #   push grafana/grafana:latest grafana  -> grafana:<real_version>
+    if [[ "$is_image_id" != "true" && "$src_tag" == "latest" && ( -z "$target_arg" || "$target_arg" != *":"* ) ]]; then
         local detected_version
         detected_version=$(detect_image_version "$src_with_tag" 2>/dev/null || true)
         if [[ -n "$detected_version" ]]; then
@@ -514,7 +517,7 @@ detect_image_version_label() {
 
 detect_image_version_by_run() {
     # 通过在容器内执行 --version 命令来尝试提取版本号
-    # 适用于 grafana/grafana 等支持 `<binary> --version` 的镜像
+    # 适用于 grafana/grafana、postgres 等支持 `<binary> --version` 的镜像
     local image_ref="$1"
     local output version
 
@@ -523,8 +526,11 @@ detect_image_version_by_run() {
         return 1
     fi
 
-    # 从输出中提取类似 12.3.0 这样的版本号（取第一个）
-    version=$(echo "$output" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+    # 从输出中提取类似 18.1 或 12.3.0 这样的版本号（取第一个）
+    # 示例：
+    #   postgres (PostgreSQL) 18.1 (Debian 18.1-1.pgdg13+2)
+    #   grafana 12.3.0 (commit: ...)
+    version=$(echo "$output" | grep -Eo '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1 || true)
     if [[ -n "$version" ]]; then
         echo "$version"
         return 0
