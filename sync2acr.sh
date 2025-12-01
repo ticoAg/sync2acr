@@ -74,7 +74,7 @@ fi
 # 安装逻辑：优先使用当前目录下的 s2i 脚本；如果不存在，则从远端仓库下载
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null || pwd)"
 SOURCE_SCRIPT_LOCAL="$SCRIPT_DIR/s2i"
-REMOTE_BASE_URL="https://raw.githubusercontent.com/ticoAg/sync2acr/main"
+REMOTE_BASE_URL="https://ghproxy.cn/https://raw.githubusercontent.com/ticoAg/sync2acr/main"
 REMOTE_SCRIPT_URL="$REMOTE_BASE_URL/s2i"
 
 if [[ -r "$SOURCE_SCRIPT_LOCAL" ]]; then
